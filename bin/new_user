@@ -1,0 +1,198 @@
+#!/usr/bin/env perl
+
+use strict;
+use warnings;
+use 5.012;
+
+use Bio::Galaxy::API;
+use Email::Valid;
+use Net::SMTP::SSL;
+use Getopt::Long;
+use Net::Domain qw/hostfqdn/;
+use File::ShareDir qw/dist_file/;
+
+my $name;
+my $username;
+my $email;
+my $url;
+my $org = 'local';
+my $pw_len = 10;
+my @cc;
+my @groups;
+my $template;
+
+GetOptions(
+    'name=s'     => \$name,
+    'user=s'     => \$username,
+    'email=s'    => \$email,
+    'url=s'      => \$url,
+    'org=s'      => \$org,
+    'pw_len=i'   => \$pw_len,
+    'group=s'    => \@groups,
+    'cc=s'       => \@cc,
+    'template=s' => \$template,
+);
+
+$url //= 'http://localhost:8080';
+
+if (! defined $username) {
+    $username = lc $name;
+    $username =~ s/\s+/_/g;
+    pos($username) = 0;
+    $username =~ s/[^a-z0-9\_\-]/-/g;
+    say "No username provided, using $username\n";
+}
+
+# validation
+die "missing name or email\n"
+    if (! defined $name || ! defined $email);
+
+if (! defined $template) {
+    $template = dist_file('galaxy_toolkit' => 'new_user.template');
+}
+die "missing or unreadable mail template\n"
+    if (! -r $template);
+
+die "Bad email\n"
+    if (! Email::Valid->address($email));
+
+my $pw = random_pw( $pw_len );
+
+my $usr = create_galaxy_user($username, $email, $pw, $url, @groups);
+my $msg = generate_email_text(
+    $template, $name, $username, $email, $org, $pw
+);
+send_mail($msg, $name, $email, $pw, @cc);
+
+exit;
+
+sub add_groups {
+
+    my ($usr, @groups) = @_;
+
+}
+
+sub create_galaxy_user {
+
+    my ($username, $email, $pw, $url, @groups) = @_;
+
+    my $check_secure = $url =~ /^http:\/\/localhost(?::\d+)?/
+        ? 0
+        : 1;
+
+    my $ua = Bio::Galaxy::API->new(
+        url => $url,
+        check_secure => $check_secure,
+    );
+
+    my $usr = $ua->new_user(
+        user     => $username,
+        email    => $email,
+        password => $pw,
+    );
+
+    if (defined $usr) {
+        say "Successfully created Galaxy user\n";
+    }
+    else {
+        say "Error creating Galaxy user\n";
+        exit;
+    }
+
+    my @found = $ua->groups;
+
+    GROUP:
+    for my $grp (@groups) {
+
+        my @g = grep { $_->name eq $grp  } @found;
+
+        if (scalar @g != 1) {
+            warn "WARNING: Failed to locate unique group named $grp\n";
+            next GROUP;
+        }
+            
+        my $new_u = $g[0]->add_user($usr);
+        if (! $new_u) {
+            warn "WARNING: Failed to add user to group $grp\n";
+            next GROUP;
+        }
+
+        warn "Successfully added user to group $grp\n";
+
+    }
+
+}
+
+sub send_mail {
+
+    my ($msg, $name, $email, $pw, @cc) = @_;
+
+    my $sender = $ENV{USER} . '@' . hostfqdn();
+
+    my $smtp = Net::SMTP->new('localhost');
+    if (! $smtp) {
+        warn "Error starting SMTP session: $@\n";
+        return;
+    }
+    $smtp->mail($sender);
+    $smtp->to($email);
+    $smtp->cc(@cc);
+
+    $smtp->data();
+    $smtp->datasend("To: $email\n");
+    $smtp->datasend("From: $sender\n");
+    $smtp->datasend("Subject: Galaxy account creation\n");
+    $smtp->datasend("\n");
+    $smtp->datasend($msg);
+    $smtp->dataend();
+
+    $smtp->quit();
+
+    say "Successfully send mail notification";
+    
+    return;
+
+}
+
+sub random_pw {
+
+    my ($len) = @_;
+
+    my @pw_chars = (
+        'A'..'Z',
+        'a'..'z',
+        0..9,
+        qw/! +/,
+    );
+
+    return join '', map {
+        $pw_chars[ int(rand(scalar(@pw_chars))) ]
+    } 1..$len;
+        
+}
+
+sub generate_email_text {
+
+    my ($template, $name, $user, $email, $org, $pw) = @_;
+
+    my $msg;
+
+    open my $tpl, '<', $template
+        or die "Error opening template file: $!\n";
+
+    while (my $line = <$tpl>) {
+        for my $token (
+            [ 'NAME'  => $name  ],
+            [ 'USER'  => $user  ],
+            [ 'EMAIL' => $email ],
+            [ 'ORG'   => $org   ],
+            [ 'PW'    => $pw    ],
+        ) {
+            $line =~ s/<<<<$token->[0]>>>>/$token->[1]/;
+        }
+        $msg .= $line;
+    }
+
+    return $msg;
+
+}

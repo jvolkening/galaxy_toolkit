@@ -1,0 +1,4 @@
+bin/new_user
+Build.PL
+MANIFEST			This list of files
+share/new_user.template
