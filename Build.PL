@@ -5,9 +5,9 @@ use warnings;
 use Module::Build;
 
 my $builder = Module::Build->new(
-    module_name        => 'galaxy_toolkit',
+    module_name        => 'Bio::Galaxy::Toolkit',
     dist_version       => 0.001,
-    dist_abstract      => 'Toolkit for managing Galaxy server',
+    dist_abstract      => 'Toolkit for managing production Galaxy server instances',
     license            => 'GPL_3',
     dist_author        => q{Jeremy Volkening <jdv@base2bio.com>},
     configure_requires => {
@@ -24,13 +24,14 @@ my $builder = Module::Build->new(
         'Net::SMTP::SSL'   => 0,
         'Net::Domain'      => 0,
         'Getopt::Long'     => 0,
+        'App::Cmd'         => 0,
     },
     meta_merge => {
         resources => {
             repository => 'https://github.com/jvolkening/galaxy_toolkit'
         }
     },
-    add_to_cleanup => [ 'galaxy_toolkit-*' ],
+    add_to_cleanup => [ 'Bio::Galaxy::Toolkit-*' ],
     create_license => 1,
     share_dir => 'share',
 );

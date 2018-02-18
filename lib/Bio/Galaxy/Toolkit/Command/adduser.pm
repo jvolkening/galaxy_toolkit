@@ -1,70 +1,89 @@
-#!/usr/bin/env perl
+package Bio::Galaxy::Toolkit::Command::adduser;
 
 use strict;
 use warnings;
 use 5.012;
 
-use Bio::Galaxy::API;
+use Bio::Galaxy::Toolkit -command;
+
 use Email::Valid;
 use Net::SMTP::SSL;
-use Getopt::Long;
 use Net::Domain qw/hostfqdn/;
 use File::ShareDir qw/dist_file/;
 
-my $name;
-my $username;
-my $email;
-my $url;
-my $org = 'local';
-my $pw_len = 10;
-my @cc;
-my @groups;
-my $template;
+use parent 'Bio::Galaxy::Toolkit::Command';
 
-GetOptions(
-    'name=s'     => \$name,
-    'user=s'     => \$username,
-    'email=s'    => \$email,
-    'url=s'      => \$url,
-    'org=s'      => \$org,
-    'pw_len=i'   => \$pw_len,
-    'group=s'    => \@groups,
-    'cc=s'       => \@cc,
-    'template=s' => \$template,
-);
+sub options {
 
-$url //= 'http://localhost:8080';
+    my ($app) = @_;
 
-if (! defined $username) {
-    $username = lc $name;
+    return (
+        [ "name=s"     => "Full name"                                 ],
+        [ "user=s"     => "User name"                                 ],
+        [ "email=s"    => "Email address"                             ],
+        [ "org=s"      => "Organization to use in notification email" ],
+        [ "pw_len=i"   => "Length of temporary password"              ],
+        [ "group=s@"   => "Group(s) to which to add user"             ],
+        [ "cc=s@"      => "Email address to copy notification to"     ],
+        [ "template=s" => "Path to email template to use"             ],
+    );
+
+}
+
+sub execute {
+
+    my ($self, $opts, $args) = @_;
+
+    my $url = $opts->{url} // 'http://localhost:8080';
+
+    # validation
+    die "missing name or email\n"
+        if (! defined $opts->{name} || ! defined $opts->{email});
+
+    my $name  = $opts->{name};
+
+    my $email = $opts->{email};
+    die "Bad email\n"
+        if (! Email::Valid->address($email));
+
+    my $username = $opts->{user} 
+        // lc $opts->{name} 
+        // die "No user name or full name specified";
+    $username = lc $opts->{name};
     $username =~ s/\s+/_/g;
     pos($username) = 0;
     $username =~ s/[^a-z0-9\_\-]/-/g;
-    say "No username provided, using $username\n";
+
+    my $pw_len = $opts->{pw_len} // 8;
+
+    my @groups = $opts->{group}
+        ? @{ $opts->{group} }
+        : ();
+
+    my $template = $opts->{template};
+
+    if (! defined $template) {
+        $template = dist_file('Bio-Galaxy-Toolkit' => 'new_user.template');
+    }
+
+    die "missing or unreadable mail template\n"
+        if (! -r $template);
+
+    my $pw = random_pw( $pw_len );
+
+    my $org = $opts->{org};
+
+    my @cc = $opts->{cc}
+        ? @{ $opts->{cc} }
+        : ();
+
+    my $usr = create_galaxy_user($username, $email, $pw, $url, @groups);
+    my $msg = generate_email_text(
+        $template, $name, $username, $email, $org, $pw
+    );
+    send_mail($msg, $name, $email, $pw, @cc);
+
 }
-
-# validation
-die "missing name or email\n"
-    if (! defined $name || ! defined $email);
-
-if (! defined $template) {
-    $template = dist_file('galaxy_toolkit' => 'new_user.template');
-}
-die "missing or unreadable mail template\n"
-    if (! -r $template);
-
-die "Bad email\n"
-    if (! Email::Valid->address($email));
-
-my $pw = random_pw( $pw_len );
-
-my $usr = create_galaxy_user($username, $email, $pw, $url, @groups);
-my $msg = generate_email_text(
-    $template, $name, $username, $email, $org, $pw
-);
-send_mail($msg, $name, $email, $pw, @cc);
-
-exit;
 
 sub add_groups {
 
@@ -196,3 +215,5 @@ sub generate_email_text {
     return $msg;
 
 }
+
+1;
