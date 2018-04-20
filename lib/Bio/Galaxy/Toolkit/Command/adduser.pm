@@ -26,6 +26,7 @@ sub options {
         [ "group=s@"   => "Group(s) to which to add user"             ],
         [ "cc=s@"      => "Email address to copy notification to"     ],
         [ "template=s" => "Path to email template to use"             ],
+        [ "create_lib" => "Create a user-specific library"            ],
     );
 
 }
@@ -77,7 +78,15 @@ sub execute {
         ? @{ $opts->{cc} }
         : ();
 
-    my $usr = create_galaxy_user($username, $email, $pw, $url, @groups);
+    my $usr = create_galaxy_user(
+        $username,
+        $email,
+        $name,
+        $pw,
+        $url,
+        $opts->{create_lib},
+        @groups,
+    );
     my $msg = generate_email_text(
         $template, $name, $username, $email, $org, $pw
     );
@@ -93,7 +102,15 @@ sub add_groups {
 
 sub create_galaxy_user {
 
-    my ($username, $email, $pw, $url, @groups) = @_;
+    my (
+        $username,
+        $email,
+        $name,
+        $pw,
+        $url,
+        $create_lib,
+        @groups,
+    ) = @_;
 
     my $check_secure = $url =~ /^http:\/\/localhost(?::\d+)?/
         ? 0
@@ -130,7 +147,7 @@ sub create_galaxy_user {
             next GROUP;
         }
             
-        my $new_u = $g[0]->add_user($usr);
+        my $new_u = $g[0]->add_user(user => $usr);
         if (! $new_u) {
             warn "WARNING: Failed to add user to group $grp\n";
             next GROUP;
@@ -139,6 +156,26 @@ sub create_galaxy_user {
         warn "Successfully added user to group $grp\n";
 
     }
+
+    # create personal library if requested
+    if ($create_lib) {
+
+        my $lib = $ua->new_library(
+            name => $email,
+            description => "Personal library for $name",
+        );
+        if (! defined $lib) {
+            warn "Personal library creation failed: $!\n";
+            return;
+        }
+        $lib->set_permissions(
+            access_ids => [$usr->{id}],
+            manage_ids => [$usr->{id}],
+            add_ids    => [$usr->{id}],
+            modify_ids => [],
+        ) or die "failed to set permissions: $!";
+
+    } 
 
 }
 
