@@ -147,8 +147,8 @@ sub create_galaxy_user {
             next GROUP;
         }
             
-        my $new_u = $g[0]->add_user(user => $usr);
-        if (! $new_u) {
+        my $success = $g[0]->add_user(user => $usr);
+        if (! $success) {
             warn "WARNING: Failed to add user to group $grp\n";
             next GROUP;
         }
