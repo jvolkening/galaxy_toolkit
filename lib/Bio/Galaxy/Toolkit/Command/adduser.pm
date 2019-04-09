@@ -204,7 +204,7 @@ sub send_mail {
 
     $smtp->quit();
 
-    say "Successfully send mail notification";
+    say "Successfully sent mail notification";
     
     return;
 

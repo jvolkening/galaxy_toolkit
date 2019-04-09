@@ -1,4 +1,7 @@
-bin/new_user
+bin/galactk
 Build.PL
+lib/Bio/Galaxy/Toolkit.pm
+lib/Bio/Galaxy/Toolkit/Command.pm
+lib/Bio/Galaxy/Toolkit/Command/adduser.pm
 MANIFEST			This list of files
 share/new_user.template
