@@ -10,6 +10,7 @@ use Email::Valid;
 use Net::SMTP::SSL;
 use Net::Domain qw/hostfqdn/;
 use File::ShareDir qw/dist_file/;
+use YAML::Tiny;
 
 use parent 'Bio::Galaxy::Toolkit::Command';
 
@@ -27,6 +28,7 @@ sub options {
         [ "cc=s@"      => "Email address to copy notification to"     ],
         [ "template=s" => "Path to email template to use"             ],
         [ "create_lib" => "Create a user-specific library"            ],
+        [ "config=s"   => "Path to configuration file"                ],
     );
 
 }
@@ -36,6 +38,13 @@ sub execute {
     my ($self, $opts, $args) = @_;
 
     my $url = $opts->{url} // 'http://localhost:8080';
+
+    # read in configuration, if present
+    my $fn_cfg = $opts->{config} // "$ENV{HOME}/.galactk.yml";
+    my $cfg = {};
+    if (-e $fn_cfg) {
+        $cfg = YAML::Tiny->read($fn_cfg)->[0];
+    }
 
     # validation
     die "missing name or email\n"
@@ -90,7 +99,7 @@ sub execute {
     my $msg = generate_email_text(
         $template, $name, $username, $email, $org, $pw
     );
-    send_mail($msg, $name, $email, $pw, @cc);
+    send_mail($cfg, $msg, $email, @cc);
 
 }
 
@@ -181,15 +190,36 @@ sub create_galaxy_user {
 
 sub send_mail {
 
-    my ($msg, $name, $email, $pw, @cc) = @_;
+    my ($cfg, $msg, $email, @cc) = @_;
 
-    my $sender = $ENV{USER} . '@' . hostfqdn();
+    my $sender = $cfg->{smarthost}->{from}
+        // $ENV{USER} . '@' . hostfqdn();
 
-    my $smtp = Net::SMTP->new('localhost');
+    my $replyto = $cfg->{smarthost}->{reply_to}
+        // $sender;
+
+    my $host = $cfg->{smarthost}->{host}
+        // 'localhost';
+
+    my $port = $cfg->{smarthost}->{port}
+        // 22;
+
+    my $smtp = Net::SMTP::SSL->new(
+        $host,
+        Port => $port,
+    );
     if (! $smtp) {
-        warn "Error starting SMTP session: $@\n";
-        return;
+        die "Error starting SMTP session: $@\n";
     }
+
+    # Authenticate if using smarthost
+    if (defined $cfg->{smarthost}) {
+        $smtp->auth(
+            $cfg->{smarthost}->{user},
+            $cfg->{smarthost}->{pass}
+        ) or die "Authentication failed!\n";
+    }
+
     $smtp->mail($sender);
     $smtp->to($email);
     $smtp->cc(@cc);
@@ -197,10 +227,12 @@ sub send_mail {
     $smtp->data();
     $smtp->datasend("To: $email\n");
     $smtp->datasend("From: $sender\n");
+    $smtp->datasend("Reply-To: $replyto\n");
     $smtp->datasend("Subject: Galaxy account creation\n");
     $smtp->datasend("\n");
     $smtp->datasend($msg);
-    $smtp->dataend();
+    $smtp->dataend()
+        or die "Failed to send email: $!";
 
     $smtp->quit();
 
