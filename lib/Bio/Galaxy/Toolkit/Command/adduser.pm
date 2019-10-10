@@ -137,10 +137,10 @@ sub create_galaxy_user {
     );
 
     if (defined $usr) {
-        say "Successfully created Galaxy user\n";
+        say "Successfully created Galaxy user";
     }
     else {
-        say "Error creating Galaxy user\n";
+        say "Error creating Galaxy user";
         exit;
     }
 
@@ -177,12 +177,21 @@ sub create_galaxy_user {
             warn "Personal library creation failed: $!\n";
             return;
         }
+
+        # CRITICAL: library permissions are set using role ID, not user ID. To
+        # do this we must obtain the ID of the private role associated with a
+        # user. User and role IDs can (and often do) collide, so failure to
+        # use the correct ID can (and will) cause incorrect permissions to be
+        # set.
+        my $role = $usr->private_role;
         $lib->set_permissions(
-            access_ids => [$usr->{id}],
-            manage_ids => [$usr->{id}],
-            add_ids    => [$usr->{id}],
+            access_ids => ["$role"],
+            manage_ids => ["$role"],
+            add_ids    => ["$role"],
             modify_ids => [],
         ) or die "failed to set permissions: $!";
+
+        say "Successfully created user library";
 
     } 
 
