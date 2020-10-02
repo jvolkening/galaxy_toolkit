@@ -221,8 +221,8 @@ sub send_mail {
         die "Error starting SMTP session: $@\n";
     }
 
-    # Authenticate if using smarthost
-    if (defined $cfg->{smarthost}) {
+    # Authenticate if given smarthost user/pass
+    if (defined $cfg->{smarthost}->{user}) {
         $smtp->auth(
             $cfg->{smarthost}->{user},
             $cfg->{smarthost}->{pass}

@@ -23,8 +23,8 @@ my $builder = Module::Build->new(
         'File::ShareDir'   => 0,
         'Net::SMTP::SSL'   => 0,
         'Net::Domain'      => 0,
-        'Getopt::Long'     => 0,
         'App::Cmd'         => 0,
+        'YAML::Tiny'       => 0,
     },
     meta_merge => {
         resources => {
