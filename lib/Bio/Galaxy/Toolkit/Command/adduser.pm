@@ -26,7 +26,6 @@ sub options {
         [ "cc=s@"      => "Email address to copy notification to"     ],
         [ "template=s" => "Path to email template to use"             ],
         [ "create_lib" => "Create a user-specific library"            ],
-        [ "config=s"   => "Path to configuration file"                ],
     );
 
 }
@@ -35,14 +34,9 @@ sub execute {
 
     my ($self, $opts, $args) = @_;
 
-    my $url = $opts->{url} // 'http://localhost:8080';
+    $self->load_config($opts->{config});
 
-    # read in configuration, if present
-    my $fn_cfg = $opts->{config} // "$ENV{HOME}/.galactk.yml";
-    my $cfg = {};
-    if (-e $fn_cfg) {
-        $cfg = YAML::Tiny->read($fn_cfg)->[0];
-    }
+    my $url = $opts->{url} // 'http://localhost:8080';
 
     # validation
     die "missing name or email\n"
@@ -97,7 +91,7 @@ sub execute {
     my $msg = generate_email_text(
         $template, $name, $username, $email, $org, $pw
     );
-    send_mail($cfg, $msg, $email, @cc);
+    $self->send_mail($msg, $email, @cc);
 
 }
 

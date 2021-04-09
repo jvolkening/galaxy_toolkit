@@ -19,13 +19,31 @@ sub opt_spec {
         [ "url=s" => "URL of server (including port if needed)",
             {default => 'http://localhost:8080'},
         ],
+        [ "config=s" => "Path to configuration file",
+            {default => "$ENV{HOME}/.galactk.yml"},
+        ],
         $class->options($app),
     );
 }
 
+sub load_config {
+
+    my ($self, $fn_cfg) = @_;
+    my $cfg = {};
+    if (-e $fn_cfg) {
+        $cfg = YAML::Tiny->read($fn_cfg)->[0];
+    }
+    $self->{config} = $cfg;
+
+}
+
+sub config { return $_[0]->{config} }
+
 sub send_mail {
 
-    my ($cfg, $msg, $email, @cc) = @_;
+    my ($self, $msg, $email, @cc) = @_;
+
+    my $cfg = $self->config;
 
     my $sender = $cfg->{smarthost}->{from}
         // $ENV{USER} . '@' . hostfqdn();
