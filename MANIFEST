@@ -5,3 +5,6 @@ lib/Bio/Galaxy/Toolkit/Command.pm
 lib/Bio/Galaxy/Toolkit/Command/adduser.pm
 MANIFEST			This list of files
 share/new_user.template
+LICENSE
+META.yml
+META.json
