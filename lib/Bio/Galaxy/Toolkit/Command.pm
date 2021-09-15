@@ -85,9 +85,12 @@ sub send_mail {
     $smtp->to($email);
     $smtp->cc(@cc);
 
+    my $cc_list = join ',', @cc;
+
     $smtp->data();
     $smtp->datasend("To: $email\n");
     $smtp->datasend("From: $sender\n");
+    $smtp->datasend("Cc: $cc_list\n");
     $smtp->datasend("Reply-To: $replyto\n");
     $smtp->datasend("Subject: Galaxy account creation\n");
     $smtp->datasend("\n");

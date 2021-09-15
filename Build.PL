@@ -6,7 +6,7 @@ use Module::Build;
 
 my $builder = Module::Build->new(
     module_name        => 'Bio::Galaxy::Toolkit',
-    dist_version       => 0.002,
+    dist_version       => 0.003,
     dist_abstract      => 'Toolkit for managing production Galaxy server instances',
     license            => 'GPL_3',
     dist_author        => q{Jeremy Volkening <jdv@base2bio.com>},
